@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  cloud-drive:
+    image: python:3.11-slim
+    container_name: cloud_drive_dev
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -r requirements.txt && 
+             python cloud_drive.py"
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code - changes reflect immediately!
+      - ./cloud_drive.py:/app/cloud_drive.py:ro
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      # Data volumes
+      - ./data/encrypted:/data/encrypted
+      - ./data/temp:/data/temp
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - UPLOAD_FOLDER=/data/encrypted
+      - TEMP_FOLDER=/data/temp
+    restart: unless-stopped
+    networks:
+      - cloud_drive_network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_dev
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared_config:/etc/cloudflared:ro
+    networks:
+      - cloud_drive_network
+    depends_on:
+      - cloud-drive
+    restart: unless-stopped
+
+networks:
+  cloud_drive_network:
+    driver: bridge
+

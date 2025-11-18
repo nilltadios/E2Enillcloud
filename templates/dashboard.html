@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E2E Encrypted Cloud Drive</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 24px;
+        }
+        .header-subtitle {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+        
+        /* Security Notice */
+        .security-notice {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .security-notice-icon {
+            font-size: 32px;
+        }
+        .security-notice-text {
+            flex: 1;
+        }
+        .security-notice-title {
+            font-weight: 600;
+            color: #2e7d32;
+            margin-bottom: 5px;
+        }
+        .security-notice-desc {
+            font-size: 14px;
+            color: #558b2f;
+        }
+        
+        .toolbar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: opacity 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn:hover {
+            opacity: 0.8;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        /* Drop Zone */
+        .drop-zone {
+            background: white;
+            border: 3px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .drop-zone:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        .drop-zone.drag-over {
+            border-color: #667eea;
+            background: #e8f0fe;
+            transform: scale(1.02);
+        }
+        .drop-zone.encrypting {
+            border-color: #f39c12;
+            background: #fff9e6;
+        }
+        .drop-zone-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        .drop-zone-text {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .drop-zone-hint {
+            color: #999;
+            font-size: 14px;
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .progress-container.active {
+            display: block;
+        }
+        .progress-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #f0f0f0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .file-list {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-item:hover {
+            background: #f8f9fa;
+        }
+        .file-item.selected {
+            background: #e8f0fe;
+        }
+        .file-item.dragging {
+            opacity: 0.5;
+        }
+        .file-icon {
+            font-size: 24px;
+            margin-right: 15px;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 3px;
+        }
+        .file-meta {
+            font-size: 12px;
+            color: #888;
+        }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .file-actions button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: opacity 0.3s;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 2000;
+            min-width: 300px;
+        }
+        .notification.success {
+            border-left: 4px solid #27ae60;
+        }
+        .notification.error {
+            border-left: 4px solid #e74c3c;
+        }
+        .notification.active {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .folder-item {
+            font-weight: 600;
+            color: #667eea;
+        }
+        .folder-children {
+            margin-left: 40px;
+        }
+        
+        .preview-container {
+            text-align: center;
+        }
+        .preview-container img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 5px;
+        }
+        .decrypting-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🔐 E2E Encrypted Cloud Drive</h1>
+            <div class="header-subtitle">Zero-Knowledge Encryption • Server Never Sees Your Files</div>
+        </div>
+        <div class="user-info">
+            <span>Welcome, <strong>{{ username }}</strong></span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Security Notice -->
+        <div class="security-notice">
+            <div class="security-notice-icon">🛡️</div>
+            <div class="security-notice-text">
+                <div class="security-notice-title">End-to-End Encrypted</div>
+                <div class="security-notice-desc">
+                    All encryption happens in your browser. The server never sees your encryption password or unencrypted files.
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                📤 Upload Files
+            </button>
+            <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">
+                📁 Upload Folder
+            </button>
+            <button class="btn btn-success" onclick="showCreateFolderModal()">
+                ➕ New Folder
+            </button>
+            <button class="btn btn-danger" onclick="deleteSelected()" id="deleteBtn" disabled>
+                🗑️ Delete
+            </button>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 Search files..." oninput="filterFiles()">
+            </div>
+            <button class="btn btn-primary" onclick="refreshFiles()">
+                🔄 Refresh
+            </button>
+        </div>
+
+        <!-- Hidden inputs -->
+        <input type="file" id="fileInput" style="display: none;" multiple>
+        <input type="file" id="folderInput" style="display: none;" webkitdirectory directory multiple>
+
+        <!-- Progress Bar -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-title" id="progressTitle">Encrypting files...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+            </div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-icon">🔒</div>
+            <div class="drop-zone-text">Drag & Drop files here - They'll be encrypted in your browser</div>
+            <div class="drop-zone-hint">Your files are encrypted before upload • Zero-knowledge security</div>
+        </div>
+
+        <!-- File List -->
+        <div class="file-list" id="fileList">
+            <div class="empty-state">
+                <div class="empty-state-icon">📂</div>
+                <p>No files yet. Upload your first encrypted file!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Modal for Decryption -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <div class="modal-header">Enter Encryption Password</div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="decryptPassword">Password</label>
+                    <input type="password" id="decryptPassword" placeholder="Enter your encryption password">
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 10px;">
+                    ℹ️ This is the password you used when you first logged in or registered.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="hidePasswordModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmDecrypt()">Decrypt & Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Folder Modal -->
+    <div class="modal" id="createFolderModal">
+        <div class="modal-content">
+            <div class="modal-header">Create New Folder</div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="folderName">Folder Name</label>
+                    <input type="text" id="folderName" placeholder="Enter folder name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="hideCreateFolderModal()">Cancel</button>
+                <button class="btn btn-success" onclick="createFolder()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content">
+            <div class="modal-header" id="previewHeader">File Preview</div>
+            <div class="modal-body preview-container" id="previewBody">
+                <div class="decrypting-spinner"></div>
+                <p>Decrypting file...</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="hidePreviewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+
+    <!-- Load Crypto Library -->
+    <script src="/static/crypto.js"></script>
+    
+    <script>
+        // Initialize crypto library
+        const crypto = new E2ECrypto();
+        
+        // Store encryption password in memory (cleared on page unload)
+        let encryptionPassword = null;
+        
+        // File management
+        let currentPath = '';
+        let allFiles = [];
+        let selectedFile = null;
+        let pendingDecryptPath = null;
+
+        // On page load, try localStorage first, then sessionStorage
+        window.addEventListener('load', () => {
+            // Try localStorage first (persists across sessions)
+            encryptionPassword = localStorage.getItem('encryptionPassword') || 
+                                sessionStorage.getItem('encryptionPassword');
+            
+            if (encryptionPassword) {
+                showNotification('Encryption ready', 'success');
+            } else {
+                const password = prompt('Enter your encryption password:\n\n(Use your login password)');
+                if (password) {
+                    encryptionPassword = password;
+                    localStorage.setItem('encryptionPassword', password);
+                    showNotification('Encryption password set', 'success');
+                } else {
+                    showNotification('Password required', 'error');
+                    setTimeout(() => window.location.href = '/logout', 2000);
+                    return;
+                }
+            }
+            
+            setupFileInputs();
+            setupDropZone();
+            refreshFiles();
+        });
+
+        // Remove the prompt, use sessionStorage
+        function askForEncryptionPassword() {
+            const password = prompt('Enter your encryption password:\n\n(Use your login password)');
+            if (password) {
+                encryptionPassword = password;
+                sessionStorage.setItem('encryptionPassword', password);
+                showNotification('Encryption password set', 'success');
+            }
+        }
+
+        function setupFileInputs() {
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+            document.getElementById('folderInput').addEventListener('change', handleFileSelect);
+        }
+
+        function setupDropZone() {
+            const dropZone = document.getElementById('dropZone');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => {
+                    dropZone.classList.add('drag-over');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => {
+                    dropZone.classList.remove('drag-over');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', handleDrop, false);
+            dropZone.addEventListener('click', () => {
+                document.getElementById('fileInput').click();
+            });
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length > 0) {
+                processFiles(Array.from(files));
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                processFiles(Array.from(files));
+            }
+            e.target.value = '';
+        }
+
+        async function processFiles(files) {
+            if (!encryptionPassword) {
+                showNotification('Please set an encryption password first', 'error');
+                askForEncryptionPassword();
+                return;
+            }
+
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressTitle = document.getElementById('progressTitle');
+            const dropZone = document.getElementById('dropZone');
+            
+            progressContainer.classList.add('active');
+            dropZone.classList.add('encrypting');
+            
+            let processed = 0;
+            
+            for (let file of files) {
+                try {
+                    progressTitle.textContent = `Encrypting ${file.name}...`;
+                    
+                    // Read file
+                    const fileData = await readFileAsArrayBuffer(file);
+                    
+                    // Encrypt in browser
+                    const encryptResult = await crypto.encryptFile(fileData, encryptionPassword);
+                    
+                    // Package encrypted data
+                    const packagedData = crypto.packageEncryptedData(encryptResult);
+                    
+                    // Prepare metadata
+                    const metadata = {
+                        original_name: file.name,
+                        extension: getFileExtension(file.name),
+                        size: file.size,
+                        encrypted_filename: generateEncryptedFilename(file.name),
+                        folder_path: file.webkitRelativePath ? getDirectoryPath(file.webkitRelativePath) : ''
+                    };
+                    
+                    // Upload encrypted blob
+                    await uploadEncryptedFile(packagedData, metadata);
+                    
+                    processed++;
+                    const percent = Math.round((processed / files.length) * 100);
+                    progressFill.style.width = percent + '%';
+                    progressFill.textContent = percent + '%';
+                    
+                } catch (error) {
+                    console.error('Error processing file:', error);
+                    showNotification(`Failed to encrypt ${file.name}: ${error.message}`, 'error');
+                }
+            }
+            
+            progressContainer.classList.remove('active');
+            dropZone.classList.remove('encrypting');
+            showNotification(`Successfully encrypted and uploaded ${processed} file(s)`, 'success');
+            refreshFiles();
+        }
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function uploadEncryptedFile(encryptedData, metadata) {
+            const formData = new FormData();
+            
+            const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
+            formData.append('file', blob, metadata.encrypted_filename);
+            formData.append('metadata', JSON.stringify(metadata));
+            
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.message);
+            }
+            
+            return result;
+        }
+
+        function generateEncryptedFilename(originalName) {
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(7);
+            const ext = getFileExtension(originalName);
+            const baseName = originalName.replace(ext, '').replace(/[^a-zA-Z0-9]/g, '_');
+            return `${baseName}_${timestamp}_${random}${ext}.enc`;
+        }
+
+        function getFileExtension(filename) {
+            const match = filename.match(/\.[^.]+$/);
+            return match ? match[0] : '';
+        }
+
+        function getDirectoryPath(fullPath) {
+            const parts = fullPath.split('/');
+            parts.pop(); // Remove filename
+            return parts.join('/');
+        }
+
+        async function refreshFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const data = await response.json();
+                allFiles = data.files;
+                renderFiles(allFiles);
+            } catch (error) {
+                showNotification('Failed to load files', 'error');
+            }
+        }
+
+        function renderFiles(files, parentElement = null, parentPath = '') {
+            const container = parentElement || document.getElementById('fileList');
+            
+            if (!parentElement) {
+                if (files.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📂</div>
+                            <p>No encrypted files yet. Upload your first file!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                container.innerHTML = '';
+            }
+
+            files.forEach(file => {
+                const relativePath = parentPath ? `${parentPath}/${file.encrypted_name || file.name}` : (file.encrypted_name || file.name);
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'file-item';
+
+                if (file.type === 'folder') {
+                    fileDiv.classList.add('folder-item');
+                    fileDiv.innerHTML = `
+                        <div class="file-icon">${file.icon}</div>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">Folder • ${file.children ? file.children.length : 0} items</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-success" onclick="downloadFolder('${file.path}', '${file.name}', event)">
+                                📦 Download All
+                            </button>
+                            <button class="btn btn-danger" onclick="deleteFolder('${file.path}', '${file.name}', event)">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    `;
+                    
+                    fileDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleFolder(fileDiv, file);
+                    });
+                    
+                    container.appendChild(fileDiv);
+                    
+                    if (file.children && file.children.length > 0) {
+                        const childContainer = document.createElement('div');
+                        childContainer.className = 'folder-children';
+                        childContainer.style.display = 'none';
+                        container.appendChild(childContainer);
+                        fileDiv.childContainer = childContainer;
+                    }
+                } else {
+                    fileDiv.innerHTML = `
+                        <div class="file-icon">${file.icon} 🔒</div>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">${file.date} • ${formatSize(file.size)} • Encrypted</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-primary" onclick="previewFile('${relativePath}', '${file.name}', event)">
+                                👁️ View
+                            </button>
+                            <button class="btn btn-success" onclick="downloadAndDecrypt('${relativePath}', event)">
+                                🔓 Download
+                            </button>
+                        </div>
+                    `;
+                    
+                    fileDiv.addEventListener('click', (e) => selectFile(relativePath, e));
+                    
+                    container.appendChild(fileDiv);
+                }
+            });
+        }
+
+        function toggleFolder(folderDiv, folder) {
+            const isOpen = folderDiv.classList.contains('open');
+            
+            if (isOpen) {
+                folderDiv.classList.remove('open');
+                if (folderDiv.childContainer) {
+                    folderDiv.childContainer.style.display = 'none';
+                    folderDiv.childContainer.innerHTML = '';
+                }
+            } else {
+                folderDiv.classList.add('open');
+                if (folder.children && folder.children.length > 0 && folderDiv.childContainer) {
+                    folderDiv.childContainer.style.display = 'block';
+                    renderFiles(folder.children, folderDiv.childContainer, folder.path);
+                }
+            }
+        }
+
+        async function downloadAndDecrypt(path, event) {
+            event.stopPropagation();
+            
+            if (!encryptionPassword) {
+                pendingDecryptPath = path;
+                document.getElementById('passwordModal').classList.add('active');
+                return;
+            }
+            
+            await performDecryptAndDownload(path, encryptionPassword);
+        }
+
+        async function performDecryptAndDownload(path, password) {
+            try {
+                showNotification('Downloading and decrypting...', 'success');
+                
+                // Download encrypted blob from server
+                const response = await fetch(`/api/download/${encodeURIComponent(path)}`);
+                const encryptedBlob = await response.arrayBuffer();
+                
+                // Unpackage and decrypt
+                const encryptedPackage = crypto.unpackageEncryptedData(encryptedBlob);
+                const decryptedData = await crypto.decryptFile(encryptedPackage, password);
+                
+                // Get original filename
+                const filename = path.split('/').pop().replace('.enc', '');
+                
+                // Download decrypted file
+                const blob = new Blob([decryptedData]);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showNotification('File decrypted and downloaded successfully', 'success');
+            } catch (error) {
+                console.error('Decryption error:', error);
+                showNotification('Decryption failed - wrong password or corrupted file', 'error');
+            }
+        }
+
+        function showPasswordModal() {
+            document.getElementById('passwordModal').classList.add('active');
+        }
+
+        function hidePasswordModal() {
+            document.getElementById('passwordModal').classList.remove('active');
+            document.getElementById('decryptPassword').value = '';
+            pendingDecryptPath = null;
+        }
+
+        async function confirmDecrypt() {
+            const password = document.getElementById('decryptPassword').value;
+            if (!password) {
+                showNotification('Please enter a password', 'error');
+                return;
+            }
+            
+            hidePasswordModal();
+            
+            if (pendingDecryptPath) {
+                await performDecryptAndDownload(pendingDecryptPath, password);
+                pendingDecryptPath = null;
+            }
+        }
+
+        function selectFile(path, event) {
+            if (event.target.tagName === 'BUTTON') return;
+            
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            event.currentTarget.classList.add('selected');
+            selectedFile = path;
+            document.getElementById('deleteBtn').disabled = false;
+        }
+
+        async function deleteSelected() {
+            if (!selectedFile) return;
+            
+            if (!confirm('Are you sure you want to delete this encrypted file?')) return;
+            
+            try {
+                const response = await fetch(`/api/delete/${encodeURIComponent(selectedFile)}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('File deleted successfully', 'success');
+                    selectedFile = null;
+                    document.getElementById('deleteBtn').disabled = true;
+                    refreshFiles();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Delete failed', 'error');
+            }
+        }
+
+        function showCreateFolderModal() {
+            document.getElementById('createFolderModal').classList.add('active');
+        }
+
+        function hideCreateFolderModal() {
+            document.getElementById('createFolderModal').classList.remove('active');
+            document.getElementById('folderName').value = '';
+        }
+
+        async function createFolder() {
+            const folderName = document.getElementById('folderName').value.trim();
+            
+            if (!folderName) {
+                showNotification('Please enter a folder name', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/create_folder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        folder_name: folderName,
+                        parent_path: currentPath
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('Folder created successfully', 'success');
+                    hideCreateFolderModal();
+                    refreshFiles();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to create folder', 'error');
+            }
+        }
+
+        async function previewFile(path, filename, event) {
+            event.stopPropagation();
+            
+            if (!encryptionPassword) {
+                showNotification('Please set encryption password first', 'error');
+                return;
+            }
+            
+            const previewModal = document.getElementById('previewModal');
+            const previewHeader = document.getElementById('previewHeader');
+            const previewBody = document.getElementById('previewBody');
+            
+            previewHeader.textContent = filename;
+            previewBody.innerHTML = '<div class="decrypting-spinner"></div><p>Decrypting and loading preview...</p>';
+            previewModal.classList.add('active');
+            
+            try {
+                // Download encrypted file
+                const response = await fetch(`/api/download/${encodeURIComponent(path)}`);
+                const encryptedBlob = await response.arrayBuffer();
+                
+                // Decrypt
+                const encryptedPackage = crypto.unpackageEncryptedData(encryptedBlob);
+                const decryptedData = await crypto.decryptFile(encryptedPackage, encryptionPassword);
+                
+                // Create preview based on file type
+                const extension = filename.split('.').pop().toLowerCase();
+                const blob = new Blob([decryptedData]);
+                const url = URL.createObjectURL(blob);
+                
+                let previewHTML = '';
+                
+                if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
+                    previewHTML = `<img src="${url}" alt="${filename}" style="max-width: 100%; max-height: 500px;">`;
+                } else if (['mp4', 'webm', 'ogg'].includes(extension)) {
+                    previewHTML = `<video controls src="${url}" style="max-width: 100%; max-height: 500px;"></video>`;
+                } else if (['mp3', 'wav', 'ogg'].includes(extension)) {
+                    previewHTML = `<audio controls src="${url}" style="width: 100%;"></audio>`;
+                } else if (['txt', 'js', 'py', 'html', 'css', 'json', 'md'].includes(extension)) {
+                    const text = new TextDecoder().decode(decryptedData);
+                    previewHTML = `<pre style="text-align: left; background: #f5f5f5; padding: 15px; border-radius: 5px; max-height: 400px; overflow: auto;">${escapeHtml(text)}</pre>`;
+                } else if (extension === 'pdf') {
+                    previewHTML = `<iframe src="${url}" width="100%" height="500px"></iframe>`;
+                } else {
+                    previewHTML = `<p>Preview not available for this file type. Click "Decrypt & Download" to view it.</p>`;
+                }
+                
+                previewBody.innerHTML = previewHTML;
+                
+                // Store for download button
+                previewBody.dataset.blobUrl = url;
+                previewBody.dataset.filename = filename;
+                
+            } catch (error) {
+                previewBody.innerHTML = `<p style="color: #e74c3c;">Preview failed: ${error.message}</p>`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function filterFiles() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            
+            if (!query) {
+                renderFiles(allFiles);
+                return;
+            }
+            
+            function searchInTree(files) {
+                let results = [];
+                for (let file of files) {
+                    if (file.name.toLowerCase().includes(query)) {
+                        results.push(file);
+                    }
+                    if (file.children) {
+                        results = results.concat(searchInTree(file.children));
+                    }
+                }
+                return results;
+            }
+            
+            const filtered = searchInTree(allFiles);
+            renderFiles(filtered);
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} active`;
+            
+            setTimeout(() => {
+                notification.classList.remove('active');
+            }, 3000);
+        }
+
+        function logout() {
+            encryptionPassword = null;
+            localStorage.removeItem('encryptionPassword');
+            sessionStorage.removeItem('encryptionPassword');
+            window.location.href = '/logout';
+        }
+
+        function hidePreviewModal() {
+            document.getElementById('previewModal').classList.remove('active');
+        }
+
+        async function downloadFolder(folderPath, folderName, event) {
+            event.stopPropagation();
+            
+            if (!encryptionPassword) {
+                showNotification('Please set encryption password first', 'error');
+                return;
+            }
+            
+            if (!confirm(`Download folder "${folderName}" as ZIP?`)) {
+                return;
+            }
+            
+            try {
+                showNotification(`Creating ZIP archive for "${folderName}"...`, 'success');
+                
+                // Find folder in tree
+                const folder = findFolderInTree(allFiles, folderPath);
+                if (!folder || !folder.children) {
+                    showNotification('Folder not found or empty', 'error');
+                    return;
+                }
+                
+                // Create new ZIP
+                const zip = new JSZip();
+                
+                // Get all files recursively
+                const files = getAllFilesFromFolder(folder);
+                
+                let processedCount = 0;
+                for (const file of files) {
+                    try {
+                        showNotification(`Processing ${processedCount + 1}/${files.length}: ${file.name}`, 'success');
+                        
+                        // Download encrypted file
+                        const response = await fetch(`/api/download/${encodeURIComponent(file.path)}`);
+                        const encryptedBlob = await response.arrayBuffer();
+                        
+                        // Decrypt
+                        const encryptedPackage = crypto.unpackageEncryptedData(encryptedBlob);
+                        const decryptedData = await crypto.decryptFile(encryptedPackage, encryptionPassword);
+                        
+                        // Get relative path within folder for ZIP structure
+                        const relativePath = file.path.replace(folderPath + '/', '');
+                        
+                        // Add to ZIP with folder structure
+                        zip.file(relativePath, decryptedData);
+                        
+                        processedCount++;
+                    } catch (error) {
+                        console.error(`Failed to process ${file.name}:`, error);
+                    }
+                }
+                
+                // Generate ZIP file
+                showNotification('Generating ZIP file...', 'success');
+                const zipBlob = await zip.generateAsync({
+                    type: 'blob',
+                    compression: 'DEFLATE',
+                    compressionOptions: {
+                        level: 6
+                    }
+                });
+                
+                // Download ZIP
+                const url = URL.createObjectURL(zipBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${folderName}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showNotification(`Downloaded "${folderName}.zip" with ${processedCount} files`, 'success');
+            } catch (error) {
+                console.error('Folder download error:', error);
+                showNotification(`Folder download failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteFolder(folderPath, folderName, event) {
+            event.stopPropagation();
+            
+            if (!confirm(`Delete folder "${folderName}" and ALL its contents?\n\nThis cannot be undone!`)) {
+                return;
+            }
+            
+            try {
+                showNotification(`Deleting folder "${folderName}"...`, 'success');
+                
+                // Use dedicated folder delete endpoint
+                const response = await fetch(`/api/delete_folder/${encodeURIComponent(folderPath)}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(`Folder "${folderName}" deleted completely`, 'success');
+                    refreshFiles();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            } catch (error) {
+                showNotification(`Folder deletion failed: ${error.message}`, 'error');
+            }
+        }
+
+
+        function findFolderInTree(files, path) {
+            for (const file of files) {
+                if (file.path === path && file.type === 'folder') {
+                    return file;
+                }
+                if (file.children) {
+                    const found = findFolderInTree(file.children, path);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        function getAllFilesFromFolder(folder) {
+            let allFiles = [];
+            
+            if (folder.children) {
+                for (const item of folder.children) {
+                    if (item.type === 'file') {
+                        allFiles.push(item);
+                    } else if (item.type === 'folder' && item.children) {
+                        allFiles = allFiles.concat(getAllFilesFromFolder(item));
+                    }
+                }
+            }
+            
+            return allFiles;
+        }
+
+    </script>
+</body>
+</html>
+

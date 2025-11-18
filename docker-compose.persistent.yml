@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  cloud-drive:
+    build: .
+    container_name: cloud_drive_app
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./data/encrypted:/data/encrypted
+      - ./data/temp:/data/temp
+    environment:
+      - UPLOAD_FOLDER=/data/encrypted
+      - TEMP_FOLDER=/data/temp
+    restart: unless-stopped
+    networks:
+      - cloud_drive_network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_persistent
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      # Mount from project directory - fully portable!
+      - ./cloudflared_config:/etc/cloudflared:ro
+    networks:
+      - cloud_drive_network
+    depends_on:
+      - cloud-drive
+    restart: unless-stopped
+
+networks:
+  cloud_drive_network:
+    driver: bridge
+
