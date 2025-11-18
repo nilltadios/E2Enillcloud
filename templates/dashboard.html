@@ -540,6 +540,7 @@
         let allFiles = [];
         let selectedFile = null;
         let pendingDecryptPath = null;
+        let pendingDecryptName = null;
 
         // On page load, try localStorage first, then sessionStorage
         window.addEventListener('load', () => {
@@ -812,7 +813,7 @@
                             <button class="btn btn-primary" onclick="previewFile('${relativePath}', '${file.name}', event)">
                                 👁️ View
                             </button>
-                            <button class="btn btn-success" onclick="downloadAndDecrypt('${relativePath}', event)">
+                            <button class="btn btn-success" onclick="downloadAndDecrypt('${relativePath}', '${file.name}', event)">
                                 🔓 Download
                             </button>
                         </div>
@@ -843,19 +844,21 @@
             }
         }
 
-        async function downloadAndDecrypt(path, event) {
+        async function downloadAndDecrypt(path, originalName, event) {
             event.stopPropagation();
             
             if (!encryptionPassword) {
                 pendingDecryptPath = path;
+                pendingDecryptName = originalName; // Store the name for later
                 document.getElementById('passwordModal').classList.add('active');
                 return;
             }
             
-            await performDecryptAndDownload(path, encryptionPassword);
+            await performDecryptAndDownload(path, encryptionPassword, originalName);
         }
 
-        async function performDecryptAndDownload(path, password) {
+        // Update the signature to accept originalName
+        async function performDecryptAndDownload(path, password, originalName) {
             try {
                 showNotification('Downloading and decrypting...', 'success');
                 
@@ -867,15 +870,18 @@
                 const encryptedPackage = crypto.unpackageEncryptedData(encryptedBlob);
                 const decryptedData = await crypto.decryptFile(encryptedPackage, password);
                 
-                // Get original filename
-                const filename = path.split('/').pop().replace('.enc', '');
+                // --- CHANGE START ---
+                // REMOVED: const filename = path.split('/').pop().replace('.enc', '');
+                // USE: originalName passed to the function
+                const filename = originalName || 'decrypted_file'; 
+                // --- CHANGE END ---
                 
                 // Download decrypted file
                 const blob = new Blob([decryptedData]);
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = filename;
+                a.download = filename; // This forces the browser to use the original name
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -908,8 +914,10 @@
             hidePasswordModal();
             
             if (pendingDecryptPath) {
-                await performDecryptAndDownload(pendingDecryptPath, password);
+                // Pass the stored name here
+                await performDecryptAndDownload(pendingDecryptPath, password, pendingDecryptName);
                 pendingDecryptPath = null;
+                pendingDecryptName = null; // Clear it
             }
         }
 
@@ -1149,13 +1157,22 @@
                         
                         // Decrypt
                         const encryptedPackage = crypto.unpackageEncryptedData(encryptedBlob);
-                        const decryptedData = await crypto.decryptFile(encryptedPackage, encryptionPassword);
-                        
-                        // Get relative path within folder for ZIP structure
-                        const relativePath = file.path.replace(folderPath + '/', '');
-                        
-                        // Add to ZIP with folder structure
-                        zip.file(relativePath, decryptedData);
+                        const decryptedData = await crypto.decryptFile(encryptedPackage, encryptionPassword);        
+
+                        // --- FIX START: Use original filename in ZIP ---
+                        // 1. Get the directory path relative to the folder we are downloading
+                        let relativePathStr = file.path.replace(folderPath + '/', '');
+
+                        // 2. Strip the encrypted filename from the end of that path
+                        const lastSlashIndex = relativePathStr.lastIndexOf('/');
+                        const directoryPath = lastSlashIndex !== -1 ? relativePathStr.substring(0, lastSlashIndex + 1) : '';
+
+                        // 3. Combine the directory path with the ORIGINAL file name
+                        const finalZipPath = directoryPath + file.name;
+
+                        // Add to ZIP with correct name
+                        zip.file(finalZipPath, decryptedData);
+                        // --- FIX END ---
                         
                         processedCount++;
                     } catch (error) {

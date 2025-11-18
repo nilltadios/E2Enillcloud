@@ -31,9 +31,9 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared_dev
-    command: tunnel --config /etc/cloudflared/config.yml run
+    command: tunnel --config /etc/cloudflared/config_dev.yml run
     volumes:
-      - ./cloudflared_config:/etc/cloudflared:ro
+      - ./cloudflared_config:/etc/cloudflared:ro,z
     networks:
       - cloud_drive_network
     depends_on:
