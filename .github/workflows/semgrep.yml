@@ -1,0 +1,17 @@
+name: Semgrep Security Scan
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  semgrep:
+    name: Scan
+    runs-on: ubuntu-latest
+    container:
+      # This image comes pre-installed with rules for Python, JS, and HTML
+      image: returntocorp/semgrep
+    steps:
+      - uses: actions/checkout@v3
+      - run: semgrep scan --config=auto --error
