@@ -1,0 +1,21 @@
+name: Snyk Security Scan
+on: push
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      
+      # This installs your Python dependencies so Snyk can analyze them
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          # "monitor" sends the results to your Snyk dashboard
+          # "test" would break the build if bugs are found. 
+          # We use monitor first so you can see the report without breaking code.
+          command: monitor
