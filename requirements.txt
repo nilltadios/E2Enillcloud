@@ -2,4 +2,4 @@ flask==3.0.0
 flask-login==0.6.3
 flask-cors==6.0.0
 cryptography==41.0.7
-werkzeug==3.0.1
+werkzeug==3.0.6
