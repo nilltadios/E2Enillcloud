@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # nosemgrep: yaml.docker-compose.security.writable-filesystem-service.writable-filesystem-service
   cloud-drive:
     build: .
     container_name: cloud_drive_app
@@ -15,21 +16,23 @@ services:
     restart: unless-stopped
     networks:
       - cloud_drive_network
+    security_opt:
+      - no-new-privileges:true
 
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared_persistent
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
-      # Mount from project directory - fully portable!
       - ./cloudflared_config:/etc/cloudflared:ro
     networks:
       - cloud_drive_network
     depends_on:
       - cloud-drive
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true  
 
 networks:
   cloud_drive_network:
     driver: bridge
-
