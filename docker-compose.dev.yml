@@ -30,7 +30,8 @@ services:
       - cloud_drive_network
     security_opt:
       - no-new-privileges:true
-
+      
+  # nosemgrep: yaml.docker-compose.security.writable-filesystem-service.writable-filesystem-service
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared_dev

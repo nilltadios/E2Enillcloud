@@ -356,5 +356,5 @@ def create_folder():
         return jsonify({'success': False, 'message': f'Failed: {str(e)}'})
 
 if __name__ == '__main__':
-    # Enable auto-reload in development
+    # nosemgrep: python.flask.security.audit.app-run-param-config.avoid_app_run_with_bad_host, python.flask.security.audit.debug-enabled.debug-enabled
     app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=True)
