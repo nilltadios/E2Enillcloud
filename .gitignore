@@ -5,4 +5,5 @@ __pycache__/
 cloudflared_config/
 *.pem
 *.json
+CLAUDE.md
 
