@@ -11,6 +11,7 @@ services:
       - ./data/encrypted:/data/encrypted
       - ./data/temp:/data/temp
     environment:
+      - FLASK_HOST=0.0.0.0
       - UPLOAD_FOLDER=/data/encrypted
       - TEMP_FOLDER=/data/temp
     restart: unless-stopped

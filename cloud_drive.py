@@ -519,4 +519,7 @@ def create_folder():
 if __name__ == '__main__':
     # Security: Debug mode controlled by environment variable
     debug_mode = os.environ.get('FLASK_DEBUG', '0') == '1'
-    app.run(host='0.0.0.0', port=5000, debug=debug_mode, use_reloader=debug_mode)
+    # Security: Host binding controlled by environment variable
+    # Default to localhost; set FLASK_HOST=0.0.0.0 in Docker containers
+    flask_host = os.environ.get('FLASK_HOST', '127.0.0.1')
+    app.run(host=flask_host, port=5000, debug=debug_mode, use_reloader=debug_mode)
