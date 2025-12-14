@@ -4,6 +4,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -12,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY cloud_drive.py .
 COPY templates/ templates/
 COPY static/ static/
+COPY .well-known/ .well-known/
 
 RUN useradd -m -u 1000 appuser && \
     mkdir -p /data/encrypted /data/temp && \

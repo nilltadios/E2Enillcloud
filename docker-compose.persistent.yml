@@ -19,6 +19,12 @@ services:
       - cloud_drive_network
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # nosemgrep: yaml.docker-compose.security.writable-filesystem-service.writable-filesystem-service
   cloudflared:
@@ -30,10 +36,17 @@ services:
     networks:
       - cloud_drive_network
     depends_on:
-      - cloud-drive
+      cloud-drive:
+        condition: service_healthy
     restart: unless-stopped
     security_opt:
-      - no-new-privileges:true  
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "cloudflared", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 networks:
   cloud_drive_network:

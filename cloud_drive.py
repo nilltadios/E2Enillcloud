@@ -224,6 +224,11 @@ def build_file_tree(directory, base_path=''):
     return tree
 
 # Routes
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Docker health checks"""
+    return jsonify({'status': 'healthy', 'service': 'cloud-drive'}), 200
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -477,6 +482,23 @@ def delete_folder_complete(folder_path):
 
     except Exception as e:
         return jsonify({'success': False, 'message': 'Delete failed'})
+
+@app.route('/.well-known/<path:filename>')
+def well_known(filename):
+    """Serve .well-known files for domain verification"""
+    well_known_dir = os.path.join(os.path.dirname(__file__), '.well-known')
+    file_path = os.path.join(well_known_dir, filename)
+
+    # Security: Prevent path traversal
+    real_well_known = os.path.realpath(well_known_dir)
+    real_file_path = os.path.realpath(file_path)
+    if not real_file_path.startswith(real_well_known + os.sep):
+        return jsonify({'error': 'Invalid path'}), 403
+
+    if os.path.exists(real_file_path) and os.path.isfile(real_file_path):
+        return send_file(real_file_path, mimetype='text/plain')
+    return jsonify({'error': 'Not found'}), 404
+
 
 @app.route('/api/create_folder', methods=['POST'])
 @login_required
