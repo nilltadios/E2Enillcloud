@@ -154,22 +154,14 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Store encryption password in sessionStorage (cleared when browser closes)
-                    // Security: Never use localStorage for sensitive data
-                    sessionStorage.setItem('encryptionPassword', password);
-
-                    // Verify storage was successful
-                    const stored = sessionStorage.getItem('encryptionPassword');
-                    if (!stored) {
-                        console.warn('sessionStorage failed, using URL param fallback');
-                    }
-
                     messageDiv.className = 'message success';
                     messageDiv.textContent = 'Login successful! Redirecting...';
                     messageDiv.style.display = 'block';
 
                     setTimeout(() => {
-                        window.location.href = '/dashboard';
+                        // Always pass password via URL fragment (not sent to server)
+                        // sessionStorage can fail on navigation in some browsers
+                        window.location.href = '/dashboard#epw=' + encodeURIComponent(btoa(password));
                     }, 1000);
                 } else {
                     messageDiv.className = 'message error';

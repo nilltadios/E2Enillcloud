@@ -483,6 +483,20 @@
             // Try to get encryption password from sessionStorage
             encryptionPassword = sessionStorage.getItem('encryptionPassword');
 
+            // Fallback: Check URL fragment for password (when sessionStorage fails)
+            if (!encryptionPassword && window.location.hash.startsWith('#epw=')) {
+                try {
+                    const encoded = window.location.hash.substring(5);
+                    encryptionPassword = atob(decodeURIComponent(encoded));
+                    // Store in sessionStorage for future use
+                    sessionStorage.setItem('encryptionPassword', encryptionPassword);
+                    // Clear the hash from URL for security
+                    history.replaceState(null, '', '/dashboard');
+                } catch (e) {
+                    console.error('Failed to decode password from URL');
+                }
+            }
+
             if (encryptionPassword) {
                 showNotification('Encryption ready', 'success');
             } else if (justLoggedIn) {

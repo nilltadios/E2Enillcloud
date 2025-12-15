@@ -108,22 +108,42 @@ Security assessment and review of the E2E encrypted cloud drive application. All
 ### 2. Password Required Each Session
 **Reason**: Using sessionStorage instead of localStorage for security. Password is cleared when browser closes.
 
+### 3. URL Fragment Password Transfer
+**Issue**: For browser compatibility (Safari ITP, private browsing), the encryption password is transferred from login to dashboard via URL fragment (`#epw=...`).
+
+**Mitigations**:
+- Fragment is base64 encoded (obfuscation, not encryption)
+- Fragment is cleared immediately with `history.replaceState()`
+- `Referrer-Policy: strict-origin-when-cross-origin` prevents URL leakage
+- URL fragments are never sent to the server
+
+**Residual Risks**:
+- Password briefly visible in URL bar (shoulder surfing)
+- Browser extensions could potentially capture the URL
+- If URL is copied before hash clears, password is exposed
+
+**Trade-off**: This approach ensures the app works across all browsers and privacy modes, at the cost of brief URL exposure.
+
 ---
 
 ## Environment Variables
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `SECRET_KEY` | Session signing key | Random (set for persistence) |
-| `FLASK_DEBUG` | Enable debug mode | `0` (disabled) |
-| `FLASK_ENV` | Set to `production` for secure cookies | Not set |
-| `CORS_ORIGINS` | Comma-separated allowed origins | None (same-origin) |
+| Variable | Purpose | Required |
+|----------|---------|----------|
+| `SECRET_KEY` | Session signing key | **Yes** |
+| `FLASK_DEBUG` | Enable debug mode | No (default: `0`) |
+| `FLASK_ENV` | Set to `production` for secure cookies | No |
+| `CORS_ORIGINS` | Comma-separated allowed origins | No (same-origin) |
 
-**Production Setup**:
+**Setup**:
+1. Copy `.env.example` to `.env`
+2. Generate a secret key and add it to `.env`:
 ```bash
-export SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
-export FLASK_ENV="production"
+cp .env.example .env
+echo "SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')" > .env
 ```
+
+**IMPORTANT**: Never commit `.env` to version control. The `.gitignore` file excludes it by default.
 
 ---
 

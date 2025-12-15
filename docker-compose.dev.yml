@@ -26,6 +26,7 @@ services:
       - FLASK_HOST=0.0.0.0
       - UPLOAD_FOLDER=/data/encrypted
       - TEMP_FOLDER=/data/temp
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required - see .env.example}
     restart: unless-stopped
     networks:
       - cloud_drive_network

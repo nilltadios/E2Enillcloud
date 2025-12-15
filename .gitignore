@@ -6,4 +6,5 @@ cloudflared_config/
 *.pem
 *.json
 CLAUDE.md
+.env
 
