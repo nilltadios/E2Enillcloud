@@ -404,6 +404,24 @@
         </div>
     </div>
 
+    <div class="modal" id="encryptionSetupModal">
+        <div class="modal-content">
+            <div class="modal-header">🔐 Set Encryption Password</div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="setupEncryptionPassword">Encryption Password</label>
+                    <input type="password" id="setupEncryptionPassword" placeholder="Enter your login password" autofocus>
+                </div>
+                <p style="color: #666; font-size: 13px; line-height: 1.4; background: #e8f5e9; padding: 10px; border-radius: 5px;">
+                    🛡️ Your files are encrypted in your browser before upload. Use your login password for encryption.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="setEncryptionPassword()">Continue</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="createFolderModal">
         <div class="modal-content">
             <div class="modal-header">Create New Folder</div>
@@ -436,8 +454,19 @@
     <div class="notification" id="notification"></div>
 
     <script src="/static/crypto.js"></script>
-    
+
     <script>
+        // Security: Fetch CSRF token for secure requests
+        let csrfToken = null;
+        async function getCsrfToken() {
+            if (!csrfToken) {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                csrfToken = data.csrf_token;
+            }
+            return csrfToken;
+        }
+
         // Initialize crypto library
         const crypto = new E2ECrypto();
         let encryptionPassword = null;
@@ -447,37 +476,62 @@
         let pendingDecryptPath = null;
         let pendingDecryptName = null;
 
+        // Check if user just logged in (passed from server)
+        const justLoggedIn = {{ 'true' if just_logged_in else 'false' }};
+
         window.addEventListener('load', () => {
-            encryptionPassword = localStorage.getItem('encryptionPassword') || 
-                                sessionStorage.getItem('encryptionPassword');
-            
+            // Try to get encryption password from sessionStorage
+            encryptionPassword = sessionStorage.getItem('encryptionPassword');
+
             if (encryptionPassword) {
                 showNotification('Encryption ready', 'success');
+            } else if (justLoggedIn) {
+                // Just logged in - show nice modal to set encryption password
+                showEncryptionSetupModal();
             } else {
-                setTimeout(() => {
-                    const password = prompt('Enter your encryption password:\n\n(Use your login password)');
-                    if (password) {
-                        encryptionPassword = password;
-                        localStorage.setItem('encryptionPassword', password);
-                        showNotification('Encryption password set', 'success');
-                    } else {
-                        showNotification('Password required', 'error');
-                    }
-                }, 500);
+                // Not a fresh login and no password - show modal
+                showEncryptionSetupModal();
             }
-            
+
             setupFileInputs();
             setupDropZone();
             refreshFiles();
         });
 
-        function askForEncryptionPassword() {
-            const password = prompt('Enter your encryption password:\n\n(Use your login password)');
-            if (password) {
-                encryptionPassword = password;
-                sessionStorage.setItem('encryptionPassword', password);
-                showNotification('Encryption password set', 'success');
+        function showEncryptionSetupModal() {
+            document.getElementById('encryptionSetupModal').classList.add('active');
+            setTimeout(() => {
+                document.getElementById('setupEncryptionPassword').focus();
+            }, 100);
+        }
+
+        function setEncryptionPassword() {
+            const password = document.getElementById('setupEncryptionPassword').value;
+            if (!password) {
+                showNotification('Please enter a password', 'error');
+                return;
             }
+            encryptionPassword = password;
+            sessionStorage.setItem('encryptionPassword', password);
+            document.getElementById('encryptionSetupModal').classList.remove('active');
+            document.getElementById('setupEncryptionPassword').value = '';
+            showNotification('Encryption ready', 'success');
+        }
+
+        // Allow Enter key to submit encryption password
+        document.addEventListener('DOMContentLoaded', () => {
+            const setupInput = document.getElementById('setupEncryptionPassword');
+            if (setupInput) {
+                setupInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        setEncryptionPassword();
+                    }
+                });
+            }
+        });
+
+        function askForEncryptionPassword() {
+            showEncryptionSetupModal();
         }
 
         function setupFileInputs() {
@@ -877,10 +931,12 @@
         async function deleteSelected() {
             if (!selectedFile) return;
             if (!confirm('Delete this encrypted file?')) return;
-            
+
             try {
+                const token = await getCsrfToken();
                 const response = await fetch(`/api/delete/${encodeURIComponent(selectedFile)}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': token }
                 });
                 const data = await response.json();
                 
@@ -912,11 +968,12 @@
                 showNotification('Enter folder name', 'error');
                 return;
             }
-            
+
             try {
+                const token = await getCsrfToken();
                 const response = await fetch('/api/create_folder', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': token },
                     body: JSON.stringify({ folder_name: folderName, parent_path: currentPath })
                 });
                 
@@ -1051,7 +1108,7 @@
 
         function logout() {
             encryptionPassword = null;
-            localStorage.removeItem('encryptionPassword');
+            // Security: Clear sensitive data from sessionStorage
             sessionStorage.removeItem('encryptionPassword');
             window.location.href = '/logout';
         }
@@ -1115,9 +1172,13 @@
         async function deleteFolder(folderPath, folderName, event) {
             event.stopPropagation();
             if (!confirm(`Delete "${folderName}" and contents?`)) return;
-            
+
             try {
-                const response = await fetch(`/api/delete_folder/${encodeURIComponent(folderPath)}`, { method: 'DELETE' });
+                const token = await getCsrfToken();
+                const response = await fetch(`/api/delete_folder/${encodeURIComponent(folderPath)}`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': token }
+                });
                 const data = await response.json();
                 if (data.success) {
                     showNotification('Folder deleted', 'success');

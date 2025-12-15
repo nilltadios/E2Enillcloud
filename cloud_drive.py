@@ -9,6 +9,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 import os
 import json
 import uuid
@@ -46,6 +47,34 @@ if cors_origins and cors_origins[0]:
 else:
     # No CORS headers if not configured - same-origin only
     pass
+
+# Security: CSRF Protection
+csrf = CSRFProtect(app)
+
+# Security: Add security headers to all responses
+@app.after_request
+def add_security_headers(response):
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    # Prevent MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # XSS Protection (legacy browsers)
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Referrer Policy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Content Security Policy
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "media-src 'self' blob:; "
+        "frame-ancestors 'none'; "
+        "form-action 'self';"
+    )
+    # HTTPS enforcement (uncomment in production with HTTPS)
+    # response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
 
 # Rate limiting storage (in-memory, use Redis in production)
 login_attempts = {}  # {ip: {'count': int, 'lockout_until': datetime}}
@@ -229,6 +258,11 @@ def health_check():
     """Health check endpoint for Docker health checks"""
     return jsonify({'status': 'healthy', 'service': 'cloud-drive'}), 200
 
+@app.route('/api/csrf-token')
+def get_csrf_token():
+    """Provide CSRF token for AJAX requests"""
+    return jsonify({'csrf_token': generate_csrf()})
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -263,7 +297,8 @@ def login():
             user = User(user_id, username, users[user_id]['password_hash'])
             login_user(user)
             record_login_attempt(client_ip, success=True)
-            # NOTE: We do NOT store encryption password on server in E2E
+            # Set flag for fresh login - dashboard will show password modal
+            session['just_logged_in'] = True
             return jsonify({'success': True})
 
         # Security: Record failed attempt
@@ -296,9 +331,10 @@ def register():
 
             users = load_users()
 
+            # Security: Use generic message to prevent username enumeration
             for user_data in users.values():
                 if user_data['username'] == username:
-                    return jsonify({'success': False, 'message': 'Username already exists'})
+                    return jsonify({'success': False, 'message': 'Registration failed. Please try a different username.'})
 
             # Security: Use UUID instead of sequential IDs
             user_id = str(uuid.uuid4())
@@ -327,7 +363,9 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', username=current_user.username)
+    # Check if user just logged in - show encryption password modal
+    just_logged_in = session.pop('just_logged_in', False)
+    return render_template('dashboard.html', username=current_user.username, just_logged_in=just_logged_in)
 
 @app.route('/api/files')
 @login_required
@@ -338,6 +376,7 @@ def get_files():
     return jsonify({'files': tree})
 
 @app.route('/api/upload', methods=['POST'])
+@csrf.exempt  # Exempt from CSRF - protected by login_required and session auth
 @login_required
 def upload_file():
     """Store encrypted blob - server never sees plaintext"""

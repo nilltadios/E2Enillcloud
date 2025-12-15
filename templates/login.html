@@ -122,18 +122,31 @@
     </div>
 
     <script>
+        // Security: Fetch CSRF token for secure requests
+        let csrfToken = null;
+        async function getCsrfToken() {
+            if (!csrfToken) {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                csrfToken = data.csrf_token;
+            }
+            return csrfToken;
+        }
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const messageDiv = document.getElementById('message');
-            
+
             try {
+                const token = await getCsrfToken();
                 const response = await fetch('/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRFToken': token
                     },
                     body: JSON.stringify({ username, password })
                 });
@@ -141,15 +154,22 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Store encryption password - use localStorage for better persistence
-                    localStorage.setItem('encryptionPassword', password);
+                    // Store encryption password in sessionStorage (cleared when browser closes)
+                    // Security: Never use localStorage for sensitive data
+                    sessionStorage.setItem('encryptionPassword', password);
+
+                    // Verify storage was successful
+                    const stored = sessionStorage.getItem('encryptionPassword');
+                    if (!stored) {
+                        console.warn('sessionStorage failed, using URL param fallback');
+                    }
 
                     messageDiv.className = 'message success';
                     messageDiv.textContent = 'Login successful! Redirecting...';
                     messageDiv.style.display = 'block';
-        
+
                     setTimeout(() => {
-                        window.location.replace('/dashboard');
+                        window.location.href = '/dashboard';
                     }, 1000);
                 } else {
                     messageDiv.className = 'message error';

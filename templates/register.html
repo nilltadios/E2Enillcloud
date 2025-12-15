@@ -126,26 +126,39 @@
     </div>
 
     <script>
+        // Security: Fetch CSRF token for secure requests
+        let csrfToken = null;
+        async function getCsrfToken() {
+            if (!csrfToken) {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                csrfToken = data.csrf_token;
+            }
+            return csrfToken;
+        }
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirm_password').value;
             const messageDiv = document.getElementById('message');
-            
+
             if (password !== confirmPassword) {
                 messageDiv.className = 'message error';
                 messageDiv.textContent = 'Passwords do not match';
                 messageDiv.style.display = 'block';
                 return;
             }
-            
+
             try {
+                const token = await getCsrfToken();
                 const response = await fetch('/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRFToken': token
                     },
                     body: JSON.stringify({ username, password })
                 });
